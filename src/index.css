@@ -1,1 +1,93 @@
 @import "tailwindcss";
+
+/*
+ * After — a quiet palette. Warm paper, soft ink, one sage for "done".
+ * No red anywhere; nothing flashes.
+ */
+@theme {
+  --font-serif: "Newsreader", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --color-paper: #f6f3ec;
+  --color-paper-2: #efebe1;
+  --color-card: #fdfcf8;
+  --color-line: #e3ded2;
+  --color-line-2: #d3ccbc;
+  --color-ink: #2b2925;
+  --color-ink-2: #5d574d;
+  --color-ink-3: #8a8377;
+  --color-sage: #5f7a63;
+  --color-sage-2: #d7e1d6;
+  --color-clay: #9a6b4e;
+  --color-clay-2: #ecdfd3;
+  --color-mist: #6b7d8c;
+  --color-mist-2: #dde4ea;
+  --color-sand: #b39a63;
+  --color-sand-2: #efe6cf;
+
+  --animate-settle: settle 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-fade: fade 0.4s ease both;
+
+  @keyframes settle {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+@layer base {
+  html {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  .serif {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    letter-spacing: -0.005em;
+  }
+
+  textarea,
+  input,
+  select {
+    font: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: default;
+  }
+
+  ::selection {
+    background: var(--color-sand-2);
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  html {
+    background: white;
+  }
+}

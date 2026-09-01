@@ -58,6 +58,7 @@ export const notify = internalAction({
         sentMessageId: res.messageId,
         sentAt: Date.now(),
         nextFollowUpAt: Date.now() + FOLLOW_UP_AFTER_MS,
+        followUpCount: task.draftKind === "follow_up" ? task.followUpCount + 1 : task.followUpCount,
         aiState: "idle",
         aiNote: guessed
           ? `No published email address was found, so this went to ${to}.${playbook?.contactFormUrl ? " Their web form may be the surer route." : ""}`

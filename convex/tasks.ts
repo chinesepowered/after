@@ -218,7 +218,12 @@ export const redraft = mutation({
     if (!task) throw new Error("Task not found");
     const { userId } = await requireMember(ctx, task.estateId);
     await rateLimiter.limit(ctx, "userLlm", { key: userId, throws: true });
-    const kind = task.status === "needs_documents" ? "documents" : task.followUpCount > 0 ? "follow_up" : "notification";
+    const kind =
+      task.status === "needs_documents" || task.draftKind === "documents"
+        ? "documents"
+        : task.status === "awaiting" || task.draftKind === "follow_up"
+          ? "follow_up"
+          : "notification";
     await ctx.db.patch(taskId, { aiState: "drafting", updatedAt: Date.now() });
     await ctx.scheduler.runAfter(0, internal.ai.draftLetter, { taskId, kind });
   },
@@ -271,10 +276,19 @@ export const simulateReply = mutation({
     await requireMember(ctx, task.estateId);
     const estate = await ctx.db.get(task.estateId);
     if (!estate) throw new Error("Estate not found");
+    // Route by the real outbound thread, exactly as AgentMail would.
+    let threadId = task.sentThreadId ?? "";
+    if (!threadId && task.sentMessageId) {
+      const sentRow = await ctx.db
+        .query("mailMessages")
+        .withIndex("by_messageId", (q) => q.eq("messageId", task.sentMessageId!))
+        .unique();
+      threadId = sentRow?.threadId ?? "";
+    }
     const id = `sim-${taskId}-${Date.now()}`;
     await ctx.runMutation(internal.mail.ingest, {
       messageId: id,
-      threadId: task.sentThreadId ?? "",
+      threadId,
       from: `${task.companyName} <bereavement@example.com>`,
       to: [],
       subject: `Re: [${estate.caseCode}] ${task.draftSubject ?? "Account of " + estate.personFirstName}`,

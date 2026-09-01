@@ -50,6 +50,10 @@ function splitLetter(raw: string): { subject: string; body: string } | null {
   const subject = m[1].replace(/^\*+|\*+$/g, "").trim().slice(0, 150);
   const body = m[2].trim();
   if (!subject || body.length < 40) return null;
+  // A letter cut off by the token budget ends mid-sentence. Never ship that.
+  const lastLine = body.split("\n").filter((l) => l.trim()).pop() ?? "";
+  const endsCleanly = /[.!?)"”]$/.test(body) || lastLine.trim().split(/\s+/).length <= 6;
+  if (!endsCleanly) return null;
   return { subject, body };
 }
 
@@ -100,14 +104,15 @@ export const draftLetter = internalAction({
       ]
         .filter(Boolean)
         .join("\n");
-      const raw = await draft(`Write the ${kind === "notification" ? "notification" : kind === "follow_up" ? "follow-up" : "documents"} letter.\n\n${facts}`, {
-        system: LETTER_SYSTEM,
-        maxTokens: 1200,
-        temperature: 0.5,
-      });
-      await ctx.runMutation(internal.usage.bump, { provider: "llm" });
-      letter = splitLetter(raw);
-      if (!letter) throw new Error("model output had no Subject line");
+      const prompt = `Write the ${kind === "notification" ? "notification" : kind === "follow_up" ? "follow-up" : "documents"} letter.\n\n${facts}`;
+      // Reasoning models spend part of the budget thinking: give room, and retry once if the letter came back cut off.
+      for (const maxTokens of [2500, 4000]) {
+        const raw = await draft(prompt, { system: LETTER_SYSTEM, maxTokens, temperature: 0.5 });
+        await ctx.runMutation(internal.usage.bump, { provider: "llm" });
+        letter = splitLetter(raw);
+        if (letter) break;
+      }
+      if (!letter) throw new Error("model output was incomplete");
       usedModel = modelId();
     } catch (e) {
       note = fallbackNote(e);
@@ -151,12 +156,7 @@ export const followUpSweep = internalAction({
         await ctx.runMutation(internal.tasks.patch, { taskId: task._id, clearFollowUp: true });
         continue;
       }
-      await ctx.runMutation(internal.tasks.patch, {
-        taskId: task._id,
-        followUpCount: task.followUpCount + 1,
-        clearFollowUp: true,
-        aiState: "drafting",
-      });
+      await ctx.runMutation(internal.tasks.patch, { taskId: task._id, clearFollowUp: true, aiState: "drafting" });
       await ctx.runAction(internal.ai.draftLetter, { taskId: task._id, kind: "follow_up" });
     }
     return { drafted: due.length };
