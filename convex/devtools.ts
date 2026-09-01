@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalQuery } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 
 /** CLI helper for verifying the mail loop: the raw mail row for a message. */
 export const mailByMessageId = internalQuery({
@@ -66,5 +66,25 @@ export const threadFor = internalQuery({
         deliveryStatus: m.deliveryStatus ?? null,
         text: (m.extractedText || m.fullText || "").slice(0, 200),
       }));
+  },
+});
+
+/**
+ * CLI helper: forget one stored email. Only ever used to clear the test rows
+ * left behind when the inbound webhook is being verified against a
+ * deployment — real mail is never deleted by the product.
+ *
+ *   pnpm exec convex run devtools:forgetMail '{"messageId":"..."}' --prod
+ */
+export const forgetMail = internalMutation({
+  args: { messageId: v.string() },
+  handler: async (ctx, { messageId }) => {
+    const row = await ctx.db
+      .query("mailMessages")
+      .withIndex("by_messageId", (q) => q.eq("messageId", messageId))
+      .unique();
+    if (!row) return { deleted: false };
+    await ctx.db.delete(row._id);
+    return { deleted: true, subject: row.subject };
   },
 });
