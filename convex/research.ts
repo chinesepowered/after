@@ -62,9 +62,18 @@ async function chooseHit(companyName: string, hits: SearchHit[]): Promise<{ hit:
   }
 }
 
+const MAX_WAITS = 4;
+
 export const lookup = internalAction({
-  args: { taskId: v.id("tasks"), userId: v.optional(v.id("users")), force: v.optional(v.boolean()) },
-  handler: async (ctx, { taskId, userId, force }) => {
+  args: {
+    taskId: v.id("tasks"),
+    userId: v.optional(v.id("users")),
+    force: v.optional(v.boolean()),
+    /** Seeding runs many lookups at once; only the global budget applies. */
+    seed: v.optional(v.boolean()),
+    attempt: v.optional(v.number()),
+  },
+  handler: async (ctx, { taskId, userId, force, seed, attempt }): Promise<void> => {
     const row = await ctx.runQuery(internal.tasks.getInternal, { taskId });
     if (!row || !row.estate) return;
     const { task, estate } = row;
@@ -88,13 +97,35 @@ export const lookup = internalAction({
     let playbookId: Id<"playbooks"> | null = null;
     let note: string | undefined;
 
+    // A family adding many companies at once should not lose the crawl to a
+    // per-user token bucket: wait for the next token (a few times), then give up.
+    if (!seed) {
+      const crawl = await rateLimiter.limit(ctx, "userCrawl", { key: limitKey });
+      const burst = crawl.ok ? await rateLimiter.limit(ctx, "globalBurst") : crawl;
+      if (!crawl.ok || !burst.ok) {
+        const wait = Math.min(Math.max(crawl.retryAfter ?? 0, burst.retryAfter ?? 0, 5_000), 10 * 60_000);
+        if ((attempt ?? 0) < MAX_WAITS) {
+          await ctx.runMutation(internal.tasks.patch, {
+            taskId,
+            aiState: "searching",
+            aiNote: "A few lookups are already running. This one is queued and will start shortly.",
+          });
+          await ctx.scheduler.runAfter(wait, internal.research.lookup, {
+            taskId,
+            userId,
+            force,
+            attempt: (attempt ?? 0) + 1,
+          });
+          return;
+        }
+      }
+    }
+
     try {
       assertNotPaused();
-      await rateLimiter.limit(ctx, "userCrawl", { key: limitKey, throws: true });
       await rateLimiter.limit(ctx, "globalCrawl", { throws: true });
-      await rateLimiter.limit(ctx, "globalBurst", { throws: true });
 
-      await ctx.runMutation(internal.tasks.patch, { taskId, aiState: "searching" });
+      await ctx.runMutation(internal.tasks.patch, { taskId, aiState: "searching", clearAiNote: true });
 
       // 2. Firecrawl search, with page content included in the results.
       const hits = await search(`${task.companyName} deceased account holder bereavement close account`, 5);
@@ -102,7 +133,7 @@ export const lookup = internalAction({
       const official = hits.filter((h) => h.url && looksOfficial(h.url, task.companyName));
 
       // 3. Let the model choose the page (or the first official hit if it cannot).
-      await rateLimiter.limit(ctx, "userLlm", { key: limitKey, throws: true });
+      if (!seed) await rateLimiter.limit(ctx, "userLlm", { key: limitKey, throws: true });
       await rateLimiter.limit(ctx, "globalLlm", { throws: true });
       const chosen = await chooseHit(task.companyName, official.length ? official : hits.slice(0, 3));
       await ctx.runMutation(internal.usage.bump, { provider: "llm" });

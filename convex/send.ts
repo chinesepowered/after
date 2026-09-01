@@ -15,11 +15,13 @@ import { FOLLOW_UP_AFTER_MS } from "./lib/product";
  * quota message synchronously); mailActions.send meters usage.
  */
 
+/** support@<registrable domain> of the page we read, e.g. help.netflix.com -> support@netflix.com. */
 function guessRecipient(companyKey: string, sourceUrl?: string): string {
   try {
     if (sourceUrl) {
-      const host = new URL(sourceUrl).hostname.replace(/^(www|help|support|community)\./, "");
-      return `support@${host}`;
+      const labels = new URL(sourceUrl).hostname.toLowerCase().split(".");
+      const keep = labels.length >= 3 && labels[labels.length - 2].length <= 3 ? 3 : 2;
+      return `support@${labels.slice(-keep).join(".")}`;
     }
   } catch {
     /* fall through */

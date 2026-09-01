@@ -30,7 +30,7 @@ Classify it:
 - needs_call: the company asks the family to phone, visit a branch, or use a channel other than email.
 - auto_reply: an automatic acknowledgement, ticket number, or out-of-office with no substantive content.
 - other: anything else (questions, partial progress, a refusal).
-Write the summary as one calm sentence for the family member, plain words, no euphemisms, no exclamation marks. List requested documents as short noun phrases.`;
+Write the summary as one calm sentence addressed to the family member, about the company in the third person ("They asked for a copy of the death certificate."). Plain words, no euphemisms, no exclamation marks. List requested documents as short noun phrases with a capital first letter ("Death certificate").`;
 
 export const onInbound = internalAction({
   args: { mailMessageId: v.id("mailMessages") },
