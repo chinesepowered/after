@@ -37,10 +37,11 @@ async function wipeDemo(ctx: { db: any }, estateId: Id<"estates">) {
     for (const m of msgs) await ctx.db.delete(m._id);
     await ctx.db.delete(t._id);
   }
-  for (const table of ["documents", "dailyPlan", "presence", "estateMembers"] as const) {
+  for (const table of ["documents", "presence", "estateMembers"] as const) {
     const rows = await ctx.db.query(table).withIndex("by_estate", (q: any) => q.eq("estateId", estateId)).collect();
     for (const r of rows) await ctx.db.delete(r._id);
   }
+  // dailyPlan is only indexed by estate *and* date; the estate prefix is enough.
   const plans = await ctx.db.query("dailyPlan").withIndex("by_estate_date", (q: any) => q.eq("estateId", estateId)).collect();
   for (const p of plans) await ctx.db.delete(p._id);
   await ctx.db.delete(estateId);
