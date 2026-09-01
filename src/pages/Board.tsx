@@ -20,6 +20,18 @@ export function Board({ slug }: { slug: string }) {
   return <BoardInner estate={estate} />;
 }
 
+/**
+ * Layout, so all five columns are always reachable and Done is never clipped:
+ *
+ *   < 1024px  everything stacks; the board scrolls sideways in fixed cards.
+ *   ≥ 1024px  two columns — the checklist on the left, the board beside it —
+ *             and the Today / Ask panel drops *below* the board.
+ *   ≥ 1536px  three columns; there is finally room for Today beside the board.
+ *
+ * A card's detail is a layer over the board below 1536px (with a soft scrim),
+ * and takes the third column at 1536px and up, so the board stays whole and you
+ * can watch a card move while you read one.
+ */
 function BoardInner({ estate }: { estate: Estate }) {
   const tasks = useQuery(api.tasks.list, { estateId: estate._id });
   const viewers = useQuery(api.estates.viewers, { estateId: estate._id }) ?? [];
@@ -104,7 +116,11 @@ function BoardInner({ estate }: { estate: Estate }) {
         </div>
       )}
 
-      <main className="mx-auto mt-4 grid max-w-[1680px] gap-4 px-4 sm:px-5 lg:grid-cols-[224px_minmax(0,1fr)] xl:grid-cols-[224px_minmax(0,1fr)_268px]">
+      <main
+        className={`mx-auto mt-4 grid max-w-[1680px] gap-4 px-4 sm:px-5 lg:grid-cols-[196px_minmax(0,1fr)] ${
+          selected ? "2xl:grid-cols-[212px_minmax(0,1fr)_440px]" : "2xl:grid-cols-[212px_minmax(0,1fr)_296px]"
+        }`}
+      >
         <aside className="space-y-4">
           <AddCompanies estateId={estate._id} tasks={tasks ?? []} canEdit={canEdit} onNotice={setNotice} />
           <Papers estateId={estate._id} canEdit={canEdit} onNotice={setNotice} />
@@ -131,7 +147,7 @@ function BoardInner({ estate }: { estate: Estate }) {
               {COLUMNS.map((col) => {
                 const items = byColumn.get(col.key) ?? [];
                 return (
-                  <div key={col.key} className="flex w-[220px] shrink-0 flex-col lg:w-auto lg:min-w-[158px] lg:flex-1 lg:basis-0">
+                  <div key={col.key} className="flex w-[220px] shrink-0 flex-col lg:w-auto lg:min-w-[136px] lg:flex-1 lg:basis-0">
                     <div className="flex items-baseline justify-between px-1 pb-2">
                       <h2 className="text-xs uppercase tracking-wide text-ink-3">{col.title}</h2>
                       <span className="text-xs text-ink-3">{items.length || ""}</span>
@@ -149,21 +165,38 @@ function BoardInner({ estate }: { estate: Estate }) {
           )}
         </section>
 
-        <aside className="space-y-4 lg:col-start-2 xl:col-start-auto">
+        {/* Today / Ask. Below the board until there is room beside it; stands
+            aside entirely while a card's detail is open in that column. */}
+        <aside
+          className={`space-y-4 lg:col-start-2 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0 2xl:col-start-3 2xl:row-start-1 2xl:block 2xl:space-y-4 ${
+            selected ? "2xl:hidden" : ""
+          }`}
+        >
           <TodayPanel estateId={estate._id} tasks={tasks ?? []} canEdit={canEdit} onOpen={setSelectedId} />
-          <AskPanel estateId={estate._id} canEdit={canEdit} />
-          <p className="px-1 text-[11px] leading-snug text-ink-3">
-            Letters go out from one shared inbox with the code {estate.caseCode} in the subject, so replies find their way
-            back to the right card.
-          </p>
+          <div className="space-y-4">
+            <AskPanel estateId={estate._id} canEdit={canEdit} />
+            <p className="px-1 text-[11px] leading-snug text-ink-3">
+              Letters go out from one shared inbox with the code {estate.caseCode} in the subject, so replies find their
+              way back to the right card.
+            </p>
+          </div>
         </aside>
-      </main>
 
-      {selected && (
-        <div className="fixed inset-y-0 right-0 z-20 w-full max-w-[480px] p-3 sm:p-4">
-          <TaskDetail key={selected._id} task={selected} canEdit={canEdit} onClose={() => setSelectedId(null)} onNotice={setNotice} />
-        </div>
-      )}
+        {selected && (
+          <>
+            <div
+              className="animate-fade fixed inset-0 z-10 bg-ink/10 2xl:hidden"
+              onClick={() => setSelectedId(null)}
+              aria-hidden
+            />
+            <div
+              className="fixed inset-y-0 right-0 z-20 w-full max-w-[460px] p-3 sm:p-4 2xl:sticky 2xl:inset-auto 2xl:top-4 2xl:z-auto 2xl:col-start-3 2xl:row-start-1 2xl:h-[calc(100dvh-2rem)] 2xl:max-w-none 2xl:p-0"
+            >
+              <TaskDetail key={selected._id} task={selected} canEdit={canEdit} onClose={() => setSelectedId(null)} onNotice={setNotice} />
+            </div>
+          </>
+        )}
+      </main>
     </div>
   );
 }
