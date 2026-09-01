@@ -121,7 +121,9 @@ function BoardInner({ estate }: { estate: Estate }) {
           selected ? "2xl:grid-cols-[212px_minmax(0,1fr)_440px]" : "2xl:grid-cols-[212px_minmax(0,1fr)_296px]"
         }`}
       >
-        <aside className="space-y-4">
+        {/* Spans both rows below 1536px so the Today panel sits directly under
+            the board instead of waiting for this column to run out. */}
+        <aside className="space-y-4 lg:row-span-2 2xl:row-span-1">
           <AddCompanies estateId={estate._id} tasks={tasks ?? []} canEdit={canEdit} onNotice={setNotice} />
           <Papers estateId={estate._id} canEdit={canEdit} onNotice={setNotice} />
         </aside>
