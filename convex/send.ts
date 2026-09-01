@@ -56,6 +56,7 @@ export const notify = internalAction({
         status: "awaiting",
         recipient: to,
         sentMessageId: res.messageId,
+        sentThreadId: res.threadId || undefined,
         sentAt: Date.now(),
         nextFollowUpAt: Date.now() + FOLLOW_UP_AFTER_MS,
         followUpCount: task.draftKind === "follow_up" ? task.followUpCount + 1 : task.followUpCount,
