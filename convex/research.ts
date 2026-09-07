@@ -17,6 +17,12 @@ import { genericPlaybook, looksOfficial } from "./lib/product";
  *   ->  (scrape if the search result had no content)  ->  LLM extracts the
  *   playbook  ->  cached in `playbooks` for every future family  ->  letter.
  *
+ * Every crawl goes through the gateway in lib/firecrawl.ts, which serves a
+ * stored copy when it has one and refuses to spend when the shared credit pool
+ * is near its floor. A refusal is not an error here: it lands in the same
+ * "we couldn't read their page" path as any other miss, so the family still
+ * gets general steps and a letter.
+ *
  * Every failure path still produces a usable card: a general playbook, marked
  * as such, and a template letter. The family is never left with nothing.
  */
@@ -36,6 +42,9 @@ const ChoiceSchema = z.object({
   index: z.number().int().nullable(),
   reason: z.string(),
 });
+
+/** Marker on the one failure we can explain honestly rather than vaguely. */
+const BUDGET_MARKER = "CRAWL_BUDGET_RESERVED";
 
 const EXTRACT_SYSTEM = `You read a company's support page and extract the exact procedure a family member must follow after an account holder has died.
 Write for a grieving person: plain words, short steps, no marketing language, no euphemisms ("died", not "passed away").
@@ -127,9 +136,15 @@ export const lookup = internalAction({
 
       await ctx.runMutation(internal.tasks.patch, { taskId, aiState: "searching", clearAiNote: true });
 
-      // 2. Firecrawl search, with page content included in the results.
-      const hits = await search(`${task.companyName} deceased account holder bereavement close account`, 5);
-      await ctx.runMutation(internal.usage.bump, { provider: "firecrawl" });
+      // 2. Firecrawl search, with page content included in the results. A stored
+      //    copy costs nothing, so only a real network call is metered.
+      const found = await search(ctx, `${task.companyName} deceased account holder bereavement close account`, 5);
+      if (!found.cached) await ctx.runMutation(internal.usage.bump, { provider: "firecrawl" });
+      const hits = found.data ?? [];
+      let budgetRefused = found.reason === "budget";
+      if (hits.length === 0) {
+        throw new Error(budgetRefused ? BUDGET_MARKER : "no results for that company");
+      }
       const official = hits.filter((h) => h.url && looksOfficial(h.url, task.companyName));
 
       // 3. Let the model choose the page (or the first official hit if it cannot).
@@ -139,17 +154,25 @@ export const lookup = internalAction({
       await ctx.runMutation(internal.usage.bump, { provider: "llm" });
       if (!chosen) throw new Error("no relevant page found");
 
-      // 4. Read the page.
+      // 4. Read the page. If the gateway will not spend and has nothing stored
+      //    for this URL, we keep whatever text the search result carried; if
+      //    that is too thin the card falls through to general steps below.
       await ctx.runMutation(internal.tasks.patch, { taskId, aiState: "reading" });
       let markdown = chosen.hit.markdown ?? "";
       let title = chosen.hit.title;
       if (markdown.length < 400) {
-        const page = await scrape(chosen.hit.url);
-        await ctx.runMutation(internal.usage.bump, { provider: "firecrawl" });
-        markdown = page.markdown;
-        title = page.title ?? title;
+        const page = await scrape(ctx, chosen.hit.url);
+        if (!page.cached) await ctx.runMutation(internal.usage.bump, { provider: "firecrawl" });
+        if (page.data) {
+          markdown = page.data.markdown;
+          title = page.data.title ?? title;
+        } else if (page.reason === "budget") {
+          budgetRefused = true;
+        }
       }
-      if (markdown.length < 200) throw new Error("page had no readable content");
+      if (markdown.length < 200) {
+        throw new Error(budgetRefused ? BUDGET_MARKER : "page had no readable content");
+      }
 
       // 5. Extract the playbook.
       const pb = await extract(
@@ -180,9 +203,11 @@ export const lookup = internalAction({
     } catch (e) {
       note = isRateLimitError(e)
         ? QUOTA_MESSAGE
-        : String(e).includes("PAUSED")
-          ? "Lookups are paused right now. These are general steps."
-          : `We could not read ${task.companyName}'s bereavement page just now, so these are general steps.`;
+        : String(e).includes(BUDGET_MARKER)
+          ? `We're showing general steps for ${task.companyName}. Live lookups are paused for now to protect the shared research budget.`
+          : String(e).includes("PAUSED")
+            ? "Lookups are paused right now. These are general steps."
+            : `We could not read ${task.companyName}'s bereavement page just now, so these are general steps.`;
       console.warn(`research.lookup(${task.companyName}) fell back: ${String(e).slice(0, 200)}`);
     }
 
@@ -207,5 +232,23 @@ export const lookup = internalAction({
       aiNote: note,
     });
     await ctx.scheduler.runAfter(0, internal.ai.draftLetter, { taskId, kind: "notification" });
+  },
+});
+
+/**
+ * Ops probe: exercise the crawl gateway directly, bypassing the rate limiters,
+ * so the credit guard and the stored-result fallback can be checked on a live
+ * deployment without touching product state.
+ *
+ *   pnpm exec convex run research:budgetProbe '{"url":"https://example.com"}'
+ */
+export const budgetProbe = internalAction({
+  args: { url: v.string() },
+  handler: async (
+    ctx,
+    { url },
+  ): Promise<{ hasData: boolean; cached: boolean; stale: boolean; reason?: string }> => {
+    const r = await scrape(ctx, url);
+    return { hasData: Boolean(r.data), cached: r.cached, stale: r.stale, reason: r.reason };
   },
 });
