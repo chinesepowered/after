@@ -12,6 +12,7 @@ import type * as ai from "../ai.js";
 import type * as ask from "../ask.js";
 import type * as assistant from "../assistant.js";
 import type * as auth from "../auth.js";
+import type * as crawlCache from "../crawlCache.js";
 import type * as crons from "../crons.js";
 import type * as devtools from "../devtools.js";
 import type * as estates from "../estates.js";
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   ask: typeof ask;
   assistant: typeof assistant;
   auth: typeof auth;
+  crawlCache: typeof crawlCache;
   crons: typeof crons;
   devtools: typeof devtools;
   estates: typeof estates;

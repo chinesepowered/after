@@ -202,4 +202,24 @@ export default defineSchema({
   })
     .index("by_estate", ["estateId"])
     .index("by_estate_user", ["estateId", "userId"]),
+
+  // ------------------------------------------------------------ crawl budget
+
+  /** Every Firecrawl result we have ever fetched, kept so a repeat costs nothing
+   * and so the app still has data to show once the credit pool is reserved. */
+  crawlCache: defineTable({
+    key: v.string(),
+    payload: v.string(),
+    credits: v.number(),
+    fetchedAt: v.number(),
+  }).index("by_key", ["key"]),
+
+  /** Authoritative Firecrawl balance plus today's spend, in credits. */
+  crawlBudget: defineTable({
+    key: v.string(),
+    remainingCredits: v.number(),
+    checkedAt: v.number(),
+    day: v.string(),
+    spentToday: v.number(),
+  }).index("by_key", ["key"]),
 });
