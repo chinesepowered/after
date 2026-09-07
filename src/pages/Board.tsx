@@ -35,6 +35,9 @@ export function Board({ slug }: { slug: string }) {
 function BoardInner({ estate }: { estate: Estate }) {
   const tasks = useQuery(api.tasks.list, { estateId: estate._id });
   const viewers = useQuery(api.estates.viewers, { estateId: estate._id }) ?? [];
+  // When the shared crawl budget is reserved we still have saved research to
+  // show. Say so plainly rather than letting the board look thin for no reason.
+  const crawl = useQuery(api.crawlCache.status);
   const heartbeat = useMutation(api.estates.heartbeat);
   const join = useMutation(api.estates.join);
   const [selectedId, setSelectedId] = useState<Id<"tasks"> | null>(null);
@@ -133,6 +136,11 @@ function BoardInner({ estate }: { estate: Estate }) {
             <div className="mb-4">
               <Notice onClose={() => setNotice(null)}>{notice}</Notice>
             </div>
+          )}
+          {crawl && !crawl.live && (
+            <p className="mb-3 px-1 text-xs leading-snug text-ink-3">
+              Showing saved research — live lookups are paused to protect the shared crawl budget.
+            </p>
           )}
           {tasks === undefined ? (
             <p className="px-2 text-sm text-ink-3">…</p>

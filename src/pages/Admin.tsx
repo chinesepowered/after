@@ -8,6 +8,7 @@ export function Admin() {
   const usage = useQuery(api.usage.today);
   const unrouted = useQuery(api.mail.unrouted) ?? [];
   const settings = useQuery(api.mail.getSettings);
+  const crawl = useQuery(api.crawlCache.status);
 
   return (
     <div className="min-h-screen">
@@ -33,6 +34,15 @@ export function Admin() {
         <p className="mt-4 text-sm text-ink-2">
           Inbox: <span className="text-ink">{settings?.inboxAddress ?? "not created yet"}</span>
         </p>
+        {crawl && (
+          <p className="mt-1 text-sm text-ink-2">
+            Crawl:{" "}
+            <span className="text-ink">
+              {crawl.live ? "live" : "saved results only — credits held in reserve"}
+            </span>
+            {crawl.checkedAt > 0 && <span className="text-ink-3"> · checked {timeAgo(crawl.checkedAt)}</span>}
+          </p>
+        )}
 
         <section className="mt-12">
           <h2 className="text-xs uppercase tracking-wide text-ink-3">Mail we couldn't match to a card</h2>
