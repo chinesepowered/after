@@ -225,11 +225,22 @@ export const lookup = internalAction({
       });
     }
 
+    // upsertPlaybook refuses to overwrite a real playbook with a generic one, so
+    // a lookup that fell back can still end up pointed at a good shared entry.
+    // When that happens the fallback note describes how we got here, not what
+    // the family is looking at, and saying "quota reached" over a complete set
+    // of steps from the company's own page is simply wrong.
+    const resolved = await ctx.runQuery(internal.tasks.playbookByKey, {
+      companyKey: task.companyKey,
+    });
+    if (resolved && resolved.quality === "ok") note = undefined;
+
     await ctx.runMutation(internal.tasks.patch, {
       taskId,
       playbookId,
       aiState: "drafting",
       aiNote: note,
+      clearAiNote: note === undefined,
     });
     await ctx.scheduler.runAfter(0, internal.ai.draftLetter, { taskId, kind: "notification" });
   },
