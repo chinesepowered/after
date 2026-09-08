@@ -88,7 +88,7 @@ export function templateLetter(c: LetterContext): { subject: string; body: strin
   const body = [
     `Hello,`,
     ``,
-    `I am writing to let you know that ${c.personFirstName}, my ${c.relationship.toLowerCase()}, died on ${formatDate(c.dateOfPassing)}. ${c.personFirstName} held an account with ${c.companyName}.`,
+    `I am writing to let you know that ${c.personFirstName} died on ${formatDate(c.dateOfPassing)}. I am their ${c.relationship.toLowerCase()}. ${c.personFirstName} held an account with ${c.companyName}.`,
     ``,
     `I would like to close the account, or transfer it if that is what your process requires. ${docs}`,
     ``,
