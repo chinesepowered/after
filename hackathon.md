@@ -4,7 +4,7 @@
 - **Event:** Convex All Gas Hackathon
 - **What it does:** Finds each company's real bereavement procedure, drafts the letters, sends them from one inbox after a person approves, and tracks every reply on a shared board.
 - **Live app:** https://kindred-guanaco-234.convex.site
-- **Repo:** private
+- **Repo:** https://github.com/chinesepowered/after
 - **Frontend:** Convex static hosting
 - **Convex deployment:** https://kindred-guanaco-234.convex.cloud
 - **Components:** @convex-dev/static-hosting, @convex-dev/agent, @convex-dev/rate-limiter
