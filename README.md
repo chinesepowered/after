@@ -2,7 +2,7 @@
 
 *The letters, forms and follow-ups that come after a death — found, written and tracked, so a family doesn't have to.*
 
-🌐 **[Live demo](https://kindred-guanaco-234.convex.site)** (example estate: [Robert's accounts](https://kindred-guanaco-234.convex.site/e/demo-robert)) · 🎥 **Demo video:** `TODO: video link` · 📓 **[Build log](hackathon.md)**
+🌐 **[Live demo](https://kindred-guanaco-234.convex.site)** (example estate: [Robert's accounts](https://kindred-guanaco-234.convex.site/e/demo-robert)) · 🎥 **Demo video:** [Watch the demo](https://www.youtube.com/watch?v=eZ8eIKz-_tc) · 📓 **[Build log](hackathon.md)**
 
 > The demo runs on the free tiers of Convex, OpenAI, Firecrawl and AgentMail, so under load some features may be rate-limited — the video shows the full flow.
 
